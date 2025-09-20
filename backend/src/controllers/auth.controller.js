@@ -1,4 +1,5 @@
 const userModel = require('../models/user.model');
+const foodPartnerModel = require('../models/foodPartner.model')
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -100,8 +101,110 @@ async function logoutUser(req, res) {
     }
 }
 
+async function registerFoodPartner(req, res) {
+    try {
+        const {name, email, password} = req.body;
+
+        const isAlreadyExist = await foodPartnerModel.findOne({email: email});
+
+        if(isAlreadyExist) {
+            return res.status(400).json({
+                message: 'Food Partner already exist, please login!'
+            })
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const foodPartner = await foodPartnerModel.create({
+            name,
+            email,
+            password: hashedPassword
+        });
+
+        const token = jwt.sign({
+            id: foodPartner._id
+        }, process.env.JWT_SECRET);
+
+        res.cookie("token", token);
+
+        res.status(201).json({
+            message: 'Food Partner registered successfully',
+            user: {
+                _id: foodPartner._id,
+                email: foodPartner.email,
+                fullname: foodPartner.fullname,
+            }
+        })
+
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({
+            message: 'Internal Server Error'
+        })
+    }
+}
+
+async function loginFoodPartner(req, res) {
+    try {
+        const {email, password} = req.body;
+        
+        const foodPartner = await foodPartnerModel.findOne({email});
+
+        if(!foodPartner) {
+            return res.status(400).json({
+                message: 'Invalid email or password'
+            })
+        }
+
+        const isPasswordValid = bcrypt.compare(password, foodPartner.password);
+
+        if(!isPasswordValid) {
+            return res.status(400).json({
+                message: 'Invalid email or password'
+            })
+        }
+
+        const token = jwt.sign({
+            id: foodPartner._id,
+        }, process.env.JWT_SECRET);
+
+        res.cookie("token", token);
+
+        res.status(200).json({
+            message: 'Food Partner logged in successfully',
+            user: {
+                _id: foodPartner._id,
+                email: foodPartner.email,
+                name: foodPartner.name
+            }
+        })
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({
+            message: 'Internal Server Error'
+        })
+    }
+}
+
+function logoutFoodPartner(req, res) {
+    try {
+        res.clearCookie("token");
+        res.status(200).json({
+            message: 'Food Partner logged out successfully.'
+        })
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({
+            message: 'Internal Server Error'
+        })
+    }
+}
+
 module.exports = {
     registerUser,
     loginUser,
     logoutUser,
+    registerFoodPartner,
+    loginFoodPartner,
+    logoutFoodPartner,
 }
